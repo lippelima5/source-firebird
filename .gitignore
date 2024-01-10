@@ -5,3 +5,6 @@
 #
 .env
 secrets/config.json
+helper.txt
+__pycache__
+source_firebird/__pycache__/*

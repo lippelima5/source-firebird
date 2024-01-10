@@ -45,7 +45,7 @@ class SourceFirebird(Source):
                 status=Status.FAILED, message=f"Error connecting to Firebird: {str(e)}"
             )
 
-    def discover(self, logger: AirbyteLogger, config: json) -> AirbyteCatalog:
+    def discover_old(self, logger: AirbyteLogger, config: json) -> AirbyteCatalog:
         """
         Discovers available tables and their schemas.
         """
@@ -69,8 +69,67 @@ class SourceFirebird(Source):
                 }
                 streams.append(AirbyteStream(name=table_name, json_schema=json_schema, supported_sync_modes=["full_refresh"] ))
             return AirbyteCatalog(streams=streams)
+    
+    def discover(self, logger: AirbyteLogger, config: json) -> AirbyteCatalog:
+        """
+        Discovers available tables and their schemas.
+        """
+        type_mapping = {
+            14: "string",   # CHAR
+            37: "string",   # VARCHAR
+            8: "integer",   # INTEGER
+            7: "integer",   # SMALLINT
+            16: "integer",  # BIGINT
+            27: "number",   # DOUBLE PRECISION
+            10: "number",   # FLOAT
+            # Adicione outros mapeamentos conforme necessário
+        }
 
-    def read(self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]) -> Generator[AirbyteMessage, None, None]:
+
+        with fdb.connect(
+            host=config["host"],
+            database=config["database"],
+            user=config["user"],
+            password=config["password"],
+            charset="ISO8859_1",
+        ) as con:
+            cursor = con.cursor()
+            cursor.execute("SELECT TRIM(RDB$RELATION_NAME) FROM RDB$RELATIONS WHERE RDB$SYSTEM_FLAG = 0")
+
+            streams = []
+            for (table_name,) in cursor:
+                column_cursor = con.cursor()
+                try:
+                    column_cursor.execute(
+                        f"""
+                        SELECT 
+                            TRIM(RF.RDB$FIELD_NAME), 
+                            F.RDB$FIELD_TYPE
+                        FROM 
+                            RDB$RELATION_FIELDS RF 
+                            JOIN RDB$FIELDS F ON RF.RDB$FIELD_SOURCE = F.RDB$FIELD_NAME
+                        WHERE RF.RDB$SYSTEM_FLAG = 0 AND
+                            RF.RDB$RELATION_NAME = '{table_name}'
+                        """
+                    )
+                    properties = {}
+                    for col_name, col_type in column_cursor:
+                        print(f"{col_name}-{col_type}")
+                        json_type = type_mapping.get(col_type, "string")  # Padrão para string se não mapeado
+                        properties[col_name] = {"type": json_type}
+
+                    json_schema = {
+                        "$schema": "http://json-schema.org/draft-07/schema#",
+                        "type": "object",
+                        "properties": properties,
+                    }
+                    streams.append(AirbyteStream(name=table_name, json_schema=json_schema, supported_sync_modes=["full_refresh"]))
+                finally:
+                    column_cursor.close() 
+            
+            return AirbyteCatalog(streams=streams)
+
+    def read2(self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]) -> Generator[AirbyteMessage, None, None]:
         """
         Reads data from the specified tables.
         """
@@ -90,9 +149,35 @@ class SourceFirebird(Source):
                     yield AirbyteMessage(
                         type=Type.RECORD,
                         record=AirbyteRecordMessage(
-                            stream=stream.name, data=data, emitted_at=int(datetime.now().timestamp()) * 1000
+                            stream=stream.stream.name, data=data, emitted_at=int(datetime.now().timestamp()) * 1000
                         ),
                     )
+
+    def read(self, logger: AirbyteLogger, config: json, catalog: ConfiguredAirbyteCatalog, state: Dict[str, any]) -> Generator[AirbyteMessage, None, None]:
+        """
+        Reads data from the specified tables.
+        """
+        with fdb.connect(
+            host=config["host"],
+            database=config["database"],
+            user=config["user"],
+            password=config["password"],
+            charset="ISO8859_1",
+        ) as con:
+            for stream in catalog.streams:
+                cursor = con.cursor()
+                cursor.execute(f"SELECT * FROM {stream.stream.name}")
+                column_names = [desc[0] for desc in cursor.description]
+
+                for row in cursor:
+                    data = {column: str(value) for column, value in zip(column_names, row)}
+                    yield AirbyteMessage(
+                        type=Type.RECORD,
+                        record=AirbyteRecordMessage(
+                            stream=stream.stream.name, data=data, emitted_at=int(datetime.now().timestamp()) * 1000
+                        ),
+                    )
+
 
     def run_query(self, logger: AirbyteLogger, config: json, query: str, stream_name: str) -> Generator[AirbyteMessage, None, None]:
         """
