@@ -1,0 +1,34 @@
+{
+  "streams": [
+    {
+      "stream": {
+        "name": "GEDISPHOR",
+        "json_schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "ID": { "type": "string" },
+            "ID_GELANSAI": { "type": "string" },
+            "DATA_DISPENSA": { "type": "string" },
+            "QUANTIDADE": { "type": "string" },
+            "ID_GELANDISPENSACAO": { "type": "string" },
+            "EMITIDO": { "type": "string" },
+            "USUARIO_EMISSAO": { "type": "string" },
+            "DATA_EMISSAO": { "type": "string" },
+            "OLD_DOC_SAI": { "type": "string" },
+            "OLD_MES_SAI": { "type": "string" },
+            "OLD_ANO_SAI": { "type": "string" },
+            "ID_SEQ_ETIQ": { "type": "string" },
+            "ID_GECADSAI": { "type": "string" },
+            "ID_PRCHKGERAL": { "type": "string" }
+          }
+        },
+        "supported_sync_modes": ["full_refresh"],
+        "source_defined_cursor": false
+      },
+      "sync_mode": "full_refresh",
+      "destination_sync_mode": "overwrite"
+    }
+  ]
+}
+

@@ -1,0 +1,13 @@
+Metadata-Version: 2.1
+Name: source_firebird
+Version: 0.0.0
+Summary: Source implementation for Firebird.
+Author: Airbyte
+Author-email: contact@airbyte.io
+Requires-Dist: airbyte-cdk~=0.2
+Requires-Dist: fdb==2.0.2
+Provides-Extra: tests
+Requires-Dist: requests-mock~=1.9.3; extra == "tests"
+Requires-Dist: pytest-mock~=3.6.1; extra == "tests"
+Requires-Dist: pytest~=6.2; extra == "tests"
+Requires-Dist: connector-acceptance-test; extra == "tests"
